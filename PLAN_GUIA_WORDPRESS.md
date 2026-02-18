@@ -8,29 +8,60 @@ Construir un sitio personal en **WordPress** (base principal), enfocado en:
 - Imagen visual **hermosa, elegante y trabajada**
 - Administración sencilla desde **wp-admin** (sin depender de desarrollo para cada cambio)
 
+Además, operar el proyecto con un flujo claro entre:
+- Tu VS Code/local
+- Repositorio GitHub
+- VM en Proxmox
+
 ---
 
-## 2) Decisiones técnicas principales
+## 2) Cómo te puedo ayudar con la VM (control remoto)
+
+Sí, puedo ejecutar comandos remotos por SSH **si desde este entorno hay conectividad a la VM** y si me compartes acceso válido.
+
+## Recomendación de seguridad para acceso
+**No usar usuario root ni contraseña compartida por chat como método principal.**
+Mejor usar:
+1. Usuario técnico dedicado (ej: `wpops`)
+2. Acceso por **llave SSH**
+3. Permisos `sudo` limitados
+4. Opcional: rotar o eliminar la llave cuando terminemos
+
+## Método recomendado de acceso
+- Tú creas usuario en VM: `wpops`
+- Añades mi clave pública temporal a `~/.ssh/authorized_keys`
+- Yo opero por SSH
+- Al finalizar, eliminas esa clave
+
+Esto te deja trazabilidad y control total.
+
+---
+
+## 3) Decisiones técnicas principales
 
 ### CMS y edición
 - **WordPress autohospedado** como núcleo.
-- Edición por bloques (Gutenberg) + patrón de diseño consistente.
-- Todo el contenido editable desde wp-admin: páginas, entradas, menú, imágenes, textos, bloques, formularios.
+- Edición por bloques (Gutenberg) + patrones reutilizables.
+- Todo el contenido cotidiano editable desde wp-admin: páginas, entradas, menú, imágenes, textos, bloques, formularios.
 
 ### Infraestructura
 - **Proxmox VM** dedicada para WordPress.
-- **Cloudflare Tunnel** para exponer el sitio al público sin abrir puertos en tu red.
-- DNS y SSL gestionados por Cloudflare.
+- **Cloudflare Tunnel** para exponer el sitio al público sin abrir puertos entrantes.
+- DNS, SSL edge, WAF y CDN en Cloudflare.
 
 ### Filosofía visual
-- Diseño premium minimalista: tipografía cuidada, ritmo visual, espacios amplios, microinteracciones discretas y consistencia de estilos.
-- Prioridad a rendimiento + estética (no sacrificar velocidad por “efectos”).
+- Diseño premium minimalista: tipografía cuidada, ritmo visual, espacios amplios, consistencia en componentes.
+- Prioridad a rendimiento + estética (sin efectos pesados innecesarios).
 
 ---
 
-## 3) Arquitectura recomendada
+## 4) Arquitectura recomendada
 
 ```text
+[Tu VS Code local] -> GitHub (repo privado)
+                         |
+                         | git pull / deploy script
+                         v
 Usuario -> Cloudflare (DNS/SSL/WAF/CDN) -> Cloudflare Tunnel (cloudflared)
        -> VM Proxmox (Ubuntu + Nginx + PHP-FPM + MariaDB + WordPress)
 ```
@@ -42,210 +73,209 @@ Usuario -> Cloudflare (DNS/SSL/WAF/CDN) -> Cloudflare Tunnel (cloudflared)
 - MariaDB 11 (o MySQL 8)
 - WordPress latest stable
 - Redis (opcional recomendado para object cache)
-- Certificados: manejados por Cloudflare en el borde (edge)
 
 ---
 
-## 4) Especificación sugerida de la VM (Proxmox)
+## 5) Propuesta clave: separar “contenido” vs “código”
 
-### Perfil inicial (suficiente para blog personal serio)
+Para que tú edites fácil y el sistema sea mantenible:
+
+## A. Lo que se edita en wp-admin (día a día)
+- Entradas, páginas, imágenes
+- Menús
+- Plantillas y patrones (si usamos block theme)
+- Formularios y textos
+
+## B. Lo que se versiona en GitHub (equipo técnico)
+- Theme hijo/custom
+- Plugins propios (si hay)
+- Configuración de infraestructura/scripts
+- Backups de configuración (no de media pesada)
+
+**Regla práctica:**
+- Contenido editorial -> wp-admin
+- Lógica/estilo estructural -> GitHub + deploy a VM
+
+---
+
+## 6) Flujo recomendado local -> GitHub -> VM
+
+## Flujo operativo (recomendado)
+1. Editas código en VS Code local (theme/plugin/config)
+2. Commit/push a GitHub (`main` o `staging`)
+3. VM hace deploy por pull controlado (manual o automatizado)
+4. Se limpian cachés
+5. Verificación funcional
+
+## Opciones de despliegue
+
+### Opción 1 (simple, recomendada al inicio): Deploy manual por SSH
+- Conectas por SSH
+- Ejecutas script `/opt/wp-deploy/deploy.sh`
+- El script hace backup rápido + `git pull` + permisos + cache flush
+
+Ventaja: máxima visibilidad y bajo riesgo para empezar.
+
+### Opción 2 (semiautomática): GitHub webhook + script en VM
+- Push a rama de producción dispara deploy
+- Requiere hardening extra
+
+Ventaja: menos pasos manuales.
+
+### Opción 3 (avanzada): GitHub Actions + SSH deploy
+- Pipeline valida y luego despliega por SSH
+- Recomendado cuando ya esté estable
+
+Ventaja: control CI/CD y calidad previa al deploy.
+
+---
+
+## 7) Estructura de repositorio sugerida
+
+```text
+repo/
+  infra/
+    nginx/
+    php/
+    cloudflared/
+    scripts/
+  wordpress/
+    wp-content/
+      themes/mi-theme-child/
+      plugins/mi-plugin-custom/   (si aplica)
+  docs/
+    runbook-operacion.md
+```
+
+Importante:
+- **No** subir `wp-config.php` con secretos reales
+- **No** subir dumps con datos sensibles
+- Usar `.env` o plantillas seguras para credenciales
+
+---
+
+## 8) Especificación sugerida de la VM (Proxmox)
+
+### Perfil inicial
 - vCPU: 2
 - RAM: 4 GB
-- Disco: 40–80 GB (SSD)
-- Red: bridge estándar de Proxmox
+- Disco: 40–80 GB SSD
 
-### Escalado futuro
-- Subir a 4 vCPU / 8 GB RAM si hay más tráfico, plugins pesados o video embeds masivos.
+### Escalado
+- 4 vCPU / 8 GB RAM si crece tráfico o complejidad.
 
-### Buenas prácticas VM
+### Buenas prácticas
 - Snapshot antes de cambios grandes
-- Backups automáticos de VM en Proxmox
-- Usuario no-root + acceso SSH por llave
+- Backups programados en Proxmox
+- SSH solo por llave
+- Usuario no-root
 
 ---
 
-## 5) Plan de implementación por fases
+## 9) Plan de implementación por fases (mejorado)
 
-## Fase A — Base del servidor
-1. Crear VM Ubuntu LTS en Proxmox.
-2. Hardening inicial:
-   - actualizar paquetes
-   - fail2ban
-   - firewall (ufw/nftables)
-   - desactivar login root por SSH
-3. Instalar Nginx, PHP-FPM, MariaDB.
-4. Crear DB y usuario dedicado para WordPress.
+## Fase A — Base VM + acceso remoto seguro
+1. Crear VM Ubuntu LTS
+2. Hardening inicial (updates, fail2ban, firewall, SSH hardening)
+3. Crear usuario técnico (`wpops`) con llave SSH
+4. Validar acceso remoto desde este entorno
 
-## Fase B — WordPress limpio
-1. Descargar e instalar WordPress.
-2. Configurar `wp-config.php` con:
-   - credenciales DB
-   - salts/keys
-   - prefijo de tablas personalizado
-   - `DISALLOW_FILE_EDIT` para seguridad
-3. Configurar permalink “Post name”.
-4. Configuración inicial de idioma, zona horaria, título y lectura.
+## Fase B — Stack web + WordPress
+1. Instalar Nginx, PHP-FPM, MariaDB
+2. Crear DB/user WordPress
+3. Instalar WordPress
+4. Configurar `wp-config.php` seguro (salts, prefijo tablas, `DISALLOW_FILE_EDIT`)
 
-## Fase C — Publicación con Cloudflare Tunnel
-1. Crear túnel con `cloudflared` en la VM.
-2. Asociar hostname (ej. `blog.tudominio.com`) al túnel.
-3. Configurar ingress hacia Nginx local (`http://localhost:80`).
-4. Verificar acceso público y SSL activo desde Cloudflare.
-5. Activar reglas de seguridad de Cloudflare (WAF y rate limiting básico).
+## Fase C — Cloudflare Tunnel
+1. Instalar/configurar `cloudflared`
+2. Crear túnel y hostname (`blog.tudominio.com`)
+3. Ingress a `http://localhost:80`
+4. Validar SSL edge + reglas WAF/rate-limit
 
 ## Fase D — Diseño visual premium
-1. Elegir base visual:
-   - Opción recomendada: theme liviano orientado a bloques (Block Theme).
-2. Definir sistema de diseño:
-   - Paleta (3–5 colores)
-   - Tipografías (máx 2 familias)
-   - Escala tipográfica
-   - Espaciado y radios
-3. Construir plantillas clave:
-   - Home (hero + secciones principales)
-   - Blog
-   - Proyectos
-   - YouTube
-   - Carro
-   - About / Contacto
-4. Ajustar responsive (mobile-first).
+1. Elegir base (block theme liviano)
+2. Definir design system (color, tipo, spacing)
+3. Construir Home/Blog/Proyectos/YouTube/Carro/About
+4. Ajuste mobile-first
 
-## Fase E — Contenido y estructura editorial
-1. Definir tipos de contenido:
-   - Entradas estándar (blog)
-   - Custom Post Type `proyecto`
-   - Custom Post Type `auto`
-2. Taxonomías recomendadas:
-   - `tema`, `tecnologia`, `estado_proyecto`, etc.
-3. Crear bloques reutilizables/patrones:
-   - Tarjeta de proyecto
-   - Lista de videos recientes
-   - Timeline de mejoras del carro
+## Fase E — GitHub + despliegue controlado
+1. Estructurar repo (theme/plugin/infra/scripts)
+2. Configurar `.gitignore` correcto para WordPress
+3. Crear script de deploy en VM
+4. Definir estrategia: manual primero, automatización después
 
-## Fase F — Rendimiento, SEO, seguridad, backups
-1. Caché de página + object cache (Redis).
-2. Optimización de imágenes (WebP/AVIF, lazy load).
-3. SEO técnico básico (metadatos, sitemap, schema).
-4. Seguridad WP:
-   - limitar intentos login
-   - 2FA para admin
-   - ocultar versión WP cuando aplique
-5. Backups automáticos:
-   - DB diaria
-   - archivos semanales
-   - copias externas (NAS o almacenamiento remoto)
+## Fase F — Operación estable
+1. Backups (DB diaria, archivos semanales, copia externa)
+2. Monitoreo básico (disco, RAM, servicios)
+3. Plan de rollback (snapshot + restore DB)
 
 ---
 
-## 6) Estructura de páginas recomendada
+## 10) Estrategia de backups y rollback
 
-- **Home**: propuesta de valor + secciones destacadas (Proyectos, YouTube, Carro, Blog)
-- **Proyectos**: grid visual + filtros
-- **YouTube**: feed curado + CTA a suscripción
-- **Mi carro**: bitácora, mods, fotos, costos, estado
-- **Blog**: artículos por categoría
-- **Sobre mí**
-- **Contacto**
+## Backups mínimos
+- DB: diario
+- `wp-content/uploads`: semanal
+- Snapshot VM: antes de cambios grandes
 
----
-
-## 7) Plugins recomendados (enfoque limpio)
-
-Mantener pocos plugins para evitar deuda técnica.
-
-- SEO: Rank Math o Yoast (uno solo)
-- Caché: LiteSpeed Cache (si aplica) o WP Rocket / alternativa compatible con Nginx
-- Seguridad: Wordfence o Solid Security (uno solo)
-- Formularios: Fluent Forms o WPForms
-- Imágenes: ShortPixel / Imagify
-- Backup: UpdraftPlus o solución a nivel servidor
-- Redirecciones: Redirection
-- SMTP: WP Mail SMTP
-
-> Regla: instalar solo lo necesario, validar compatibilidad y mantener actualizado.
+## Rollback
+1. Si falla deploy de código: revert de commit + redeploy
+2. Si falla por datos/config: restaurar DB + archivos
+3. Si falla sistema: revert snapshot VM
 
 ---
 
-## 8) Lineamientos de diseño (para que se vea “hermoso y elegante”)
+## 11) Operación diaria (quién toca qué)
 
-1. **Jerarquía tipográfica clara**: títulos con peso y cuerpo de texto legible.
-2. **Mucho espacio en blanco**: mejora percepción premium.
-3. **Paleta sobria**: color principal + acento controlado.
-4. **Consistencia**: botones, tarjetas, bordes y sombras uniformes.
-5. **Imágenes de calidad**: portada coherente por sección.
-6. **Animaciones mínimas**: suaves y con propósito.
-7. **Mobile primero**: la experiencia móvil debe ser impecable.
+## Tú (wp-admin)
+- Publicar y editar contenido
+- Gestionar menús, páginas, medios
+- Ajustes editoriales
 
----
-
-## 9) Qué podrás editar tú desde wp-admin
-
-Sin tocar código, podrás editar:
-- Páginas y entradas
-- Menús y navegación
-- Encabezado/pie (si el theme es de bloques)
-- Imágenes, galerías, embeds de YouTube
-- Categorías y etiquetas
-- Patrones y bloques reutilizables
-- Formularios y textos generales
-
-Con intervención técnica ocasional:
-- Cambios estructurales grandes del theme
-- Nuevos CPT/taxonomías complejas
-- Integraciones avanzadas
+## Yo (agente técnico)
+- Cambios de código y estructura
+- Hardening y mantenimiento técnico
+- Deploy y troubleshooting
 
 ---
 
-## 10) Operación y mantenimiento
+## 12) Checklist previo a ejecutar conexión SSH real
 
-### Rutina semanal
-- Actualizar core, themes y plugins
-- Revisar backups
-- Revisar alertas de seguridad
-
-### Rutina mensual
-- Test de restauración de backup
-- Auditoría de rendimiento (Core Web Vitals)
-- Limpieza de plugins no usados
-
-### Regla de oro
-- Todo cambio grande: snapshot de VM + backup DB antes de aplicar.
+- [ ] VM con IP fija accesible en tu red
+- [ ] Usuario técnico creado (no root)
+- [ ] Llave SSH autorizada
+- [ ] `sudo` habilitado para ese usuario
+- [ ] Firewall permitiendo SSH solo desde LAN (o IP concreta)
+- [ ] Confirmar si usaremos deploy manual o automático
 
 ---
 
-## 11) Roadmap de ejecución sugerido
+## 13) Checklist salida a producción
 
-1. Infraestructura VM + stack web
-2. WordPress base + seguridad inicial
-3. Cloudflare Tunnel + dominio
-4. Theme + sistema de diseño
-5. Estructura de contenido (CPT/taxonomías)
-6. Carga inicial de contenido
-7. Optimización final y lanzamiento
-
----
-
-## 12) Checklist de salida a producción
-
-- [ ] Acceso por dominio final funcionando
-- [ ] SSL activo en Cloudflare
-- [ ] WAF y reglas básicas activas
-- [ ] Login admin protegido con 2FA
-- [ ] Backups automáticos verificados
-- [ ] Home responsive validada en móvil
-- [ ] SEO básico configurado
-- [ ] Rendimiento aceptable (sin plugins innecesarios)
+- [ ] Dominio/subdominio funcionando por Cloudflare Tunnel
+- [ ] SSL activo
+- [ ] WAF/rate-limit básico activo
+- [ ] Admin WP protegido con 2FA
+- [ ] Backups verificados con prueba de restauración
+- [ ] Sitio responsive y rápido
+- [ ] Flujo GitHub -> VM probado
 
 ---
 
-## 13) Próximo paso sugerido
-Definir contigo estas 5 decisiones para pasar del plan a implementación:
-1. Dominio/subdominio final
-2. Theme base (Astra, Kadence, GeneratePress, Block Theme puro)
-3. Estilo visual (sobrio oscuro, claro minimal, editorial, etc.)
-4. Plugins definitivos (mínimos)
-5. Política de backups (destino y frecuencia exacta)
+## 14) Decisiones que necesitamos cerrar ahora
+
+1. Dominio final (ej. `blog.tudominio.com`)
+2. Theme base (block theme recomendado)
+3. Flujo de deploy inicial: manual por SSH o semiautomático
+4. Política de backups exacta (destino y retención)
+5. Método de acceso SSH (llave temporal recomendada)
 
 ---
 
-Si quieres, en el siguiente paso te preparo una versión **"plan de ejecución técnico"** con comandos concretos para Ubuntu, Nginx, MariaDB y cloudflared, lista para aplicarla directamente en tu VM de Proxmox.
+## 15) Siguiente paso práctico
+Cuando quieras, pasamos a ejecución real en este orden:
+1. Me compartes IP de VM + usuario técnico + método de llave SSH
+2. Validamos conexión SSH
+3. Configuro base del servidor
+4. Dejo WordPress + cloudflared + deploy script listos
+5. Te entrego runbook operativo para que tú lo puedas mantener
