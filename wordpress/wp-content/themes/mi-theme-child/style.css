@@ -1,0 +1,23 @@
+/*
+Theme Name: Mi Theme Child
+Template: twentytwentyfour
+Version: 1.0.0
+Text Domain: mi-theme-child
+*/
+
+:root {
+  --site-bg: #0b0c10;
+  --site-surface: #12141a;
+  --site-text: #f3f4f6;
+  --site-muted: #a1a1aa;
+  --site-accent: #8b5cf6;
+}
+
+body {
+  background: var(--site-bg);
+  color: var(--site-text);
+}
+
+a {
+  color: var(--site-accent);
+}

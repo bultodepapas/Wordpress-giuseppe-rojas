@@ -1,0 +1,7 @@
+tunnel: REEMPLAZAR_TUNNEL_ID
+credentials-file: /etc/cloudflared/REEMPLAZAR_TUNNEL_ID.json
+
+ingress:
+  - hostname: blog.example.com
+    service: http://localhost:80
+  - service: http_status:404

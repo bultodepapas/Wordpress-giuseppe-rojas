@@ -1,0 +1,35 @@
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Logs and temp
+*.log
+tmp/
+.cache/
+
+# WordPress runtime (not versioned)
+wordpress/wp-admin/
+wordpress/wp-includes/
+wordpress/wp-content/uploads/
+wordpress/wp-content/cache/
+wordpress/wp-content/upgrade/
+wordpress/wp-content/backups/
+wordpress/wp-content/ai1wm-backups/
+
+# Keep custom code versioned
+!wordpress/wp-content/themes/
+!wordpress/wp-content/plugins/
+
+# Node/PHP deps if used later
+node_modules/
+vendor/

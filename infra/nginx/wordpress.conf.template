@@ -1,0 +1,31 @@
+server {
+    listen 80;
+    listen [::]:80;
+    server_name blog.example.com;
+
+    root /var/www/wordpress;
+    index index.php index.html;
+
+    client_max_body_size 64M;
+
+    location / {
+        try_files $uri $uri/ /index.php?$args;
+    }
+
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/run/php/php8.3-fpm.sock;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        include fastcgi_params;
+    }
+
+    location ~* \.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2)$ {
+        expires 7d;
+        add_header Cache-Control "public, no-transform";
+        access_log off;
+    }
+
+    location ~ /\.ht {
+        deny all;
+    }
+}
