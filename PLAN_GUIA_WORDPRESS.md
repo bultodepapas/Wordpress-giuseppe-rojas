@@ -1,6 +1,7 @@
 # Plan y guía maestra: Blog personal en WordPress (VM Proxmox + Cloudflare Tunnel)
 
-ip del ct 100.82.85.18
+
+
 
 ## 1) Objetivo del proyecto
 Construir un sitio personal en **WordPress** (base principal), enfocado en:
